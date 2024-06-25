@@ -111,7 +111,7 @@ class LidarOdometry:
         while not rospy.is_shutdown():
             if self.current_scan != None:
                 source, destination = self.range_to_pcl(self.previous_scan.ranges, self.current_scan.ranges)
-                T, _, _ = icp(source, destination, max_iterations=40, tolerance=1.0e-9)
+                T = icp(source, destination, max_iterations=20, tolerance=1.0e-9)
                 self.update_pose(T)
             self.rate.sleep()
 

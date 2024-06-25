@@ -35,7 +35,13 @@ class LidarLocalization:
                                                           euler_from_quaternion([self.pose.pose.orientation.x,
                                                                                 self.pose.pose.orientation.y,
                                                                                 self.pose.pose.orientation.z,
-                                                                                self.pose.pose.orientation.w])[2]])
+                                                                                self.pose.pose.orientation.w])[2]],
+                                                laser_min_range=0.4,
+                                                laser_max_range=4,
+                                                laser_min_angle=-np.pi,
+                                                laser_max_angle=np.pi,
+                                                laser_samples=32,
+                                                x_min=-5, x_max=5, y_min=-5, y_max=5)
 
     def lidar_callback(self, data):
         self.scan = data
@@ -83,7 +89,7 @@ class LidarLocalization:
                                             self.odom.pose.pose.orientation.y,
                                             self.odom.pose.pose.orientation.z,
                                             self.pose.pose.orientation.w])[2]]
-                pose = self.particle_filter.localize(odom, self.scan.ranges, self.map.data)
+                pose = self.particle_filter.localize(odom, self.scan.ranges, self.map)
                 orientation = quaternion_from_euler(0, 0, pose[2])
                 self.pose.pose.position.x = pose[0]
                 self.pose.pose.position.y = pose[1]

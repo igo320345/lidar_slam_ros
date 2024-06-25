@@ -1,4 +1,2 @@
 scripts/__pycache__/
 .vscode/
-scripts/monte_carlo_localization_v2.py
-scripts/particle_filter_demo.py
