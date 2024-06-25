@@ -21,12 +21,11 @@
             <wheelAcceleration>1.0</wheelAcceleration>
             <wheelTorque>20</wheelTorque>
             <commandTopic>cmd_vel</commandTopic>
-            <odometryTopic>odom</odometryTopic>
-            <odometryFrame>odom</odometryFrame>
             <robotBaseFrame>base_link</robotBaseFrame>
-            <odometrySource>1</odometrySource>
-            <publishWheelTF>true</publishWheelTF>
+            <odometryTopic>odom_gazebo</odometryTopic>
             <publishOdom>false</publishOdom>
+            <publishOdomTF>false</publishOdomTF>
+            <publishWheelTF>false</publishWheelTF>
             <publishWheelJointState>true</publishWheelJointState>
             <legacyMode>false</legacyMode>
         </plugin>
@@ -41,8 +40,8 @@
             <horizontal>
                 <samples>720</samples>
                 <resolution>1</resolution>
-                <min_angle>-1.570796</min_angle>
-                <max_angle>1.570796</max_angle>
+                <min_angle>-3.141592</min_angle>
+                <max_angle>3.141592</max_angle>
             </horizontal>
             </scan>
             <range>

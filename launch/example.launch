@@ -3,15 +3,21 @@
         <arg name="world_name" value="$(find lidar_slam_ros)/worlds/empty.world"/>
         <arg name="paused" value="false"/>
         <arg name="use_sim_time" value="true"/>
-        <arg name="gui" value="false"/>
+        <arg name="gui" value="true"/>
         <arg name="debug" value="false"/>
         <arg name="verbose" value="true"/>
     </include>
+
+    
+    <arg name="rviz_conf_file" default="$(find lidar_slam_ros)/urdf/rviz_conf.rviz" />
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rviz_conf_file)" />
     <param name="robot_description" command="xacro '$(find lidar_slam_ros)/urdf/robot_model.xacro'" />
     <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" output="screen">
             <param name="publish_frequency" type="double" value="40.0" />
     </node>
     <node name="my_robot_model_spawn" pkg="gazebo_ros" type="spawn_model" output="screen"
     args="-urdf -param robot_description -model my_robot_model -x 1 -y 1 -z 0"/>
+    <node name="map_server" pkg="map_server" type="map_server" args="$(find lidar_slam_ros)/room_with_walls_1/map.yaml"/>
     <node name="lidar_odometry_node" pkg="lidar_slam_ros" type="lidar_odometry.py" output="screen"/>
+    <node name="lidar_localization_node" pkg="lidar_slam_ros" type="lidar_localization.py" output="screen"/>
 </launch>

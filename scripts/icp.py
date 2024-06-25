@@ -43,7 +43,7 @@ def best_fit_transform(A, B):
     T[:m, :m] = R
     T[:m, m] = t
 
-    return T, R, t
+    return T
 
 
 def nearest_neighbor(src, dst):
@@ -59,7 +59,7 @@ def nearest_neighbor(src, dst):
 
     assert src.shape == dst.shape
 
-    neigh = NearestNeighbors(n_neighbors=1)
+    neigh = NearestNeighbors(n_neighbors=1, algorithm='kd_tree')
     neigh.fit(dst)
     distances, indices = neigh.kneighbors(src, return_distance=True)
     return distances.ravel(), indices.ravel()
@@ -102,7 +102,7 @@ def icp(A, B, init_pose=None, max_iterations=20, tolerance=0.001):
         distances, indices = nearest_neighbor(src[:m,:].T, dst[:m,:].T)
 
         # compute the transformation between the current source and nearest destination points
-        T,_,_ = best_fit_transform(src[:m,:].T, dst[:m,indices].T)
+        T = best_fit_transform(src[:m,:].T, dst[:m,indices].T)
 
         # update the current source
         src = np.dot(T, src)
@@ -114,6 +114,6 @@ def icp(A, B, init_pose=None, max_iterations=20, tolerance=0.001):
         prev_error = mean_error
 
     # calculate final transformation
-    T,_,_ = best_fit_transform(A, src[:m,:].T)
+    T = best_fit_transform(A, src[:m,:].T)
 
     return T, distances, i
