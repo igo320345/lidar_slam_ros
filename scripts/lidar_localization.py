@@ -24,12 +24,10 @@ class LidarLocalization:
         self.scan = None
         self.odom = None
         self.pose = PoseStamped()
-        self.pose.pose.position.x = 0
-        self.pose.pose.position.y = 0
         self.map = None
         self.pose.header.stamp = rospy.Time.now()
         self.pose.header.frame_id = 'base_link'
-        self.particle_filter = ParticleFilter(num_particles=20,
+        self.particle_filter = ParticleFilter(num_particles=50,
                                               init_state=[self.pose.pose.position.x,
                                                           self.pose.pose.position.y, 
                                                           euler_from_quaternion([self.pose.pose.orientation.x,
