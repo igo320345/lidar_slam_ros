@@ -1,7 +1,8 @@
 import numpy as np
+from tf.transformations import quaternion_matrix, quaternion_multiply, euler_from_quaternion, quaternion_inverse
 
 class ParticleFilter:
-    def __init__(self, num_particles, init_state, laser_min_range, laser_max_range, laser_min_angle, laser_max_angle, laser_samples, x_min, x_max, y_min, y_max):
+    def __init__(self, num_particles, init_state, laser_min_range, laser_max_range, laser_min_angle, laser_max_angle, laser_samples, x_min, x_max, y_min, y_max, translation_noise, rotation_noise, laser_noise):
         self.num_particles = num_particles
         self.init_state = init_state
 
@@ -20,15 +21,19 @@ class ParticleFilter:
         self.particles = np.zeros((self.num_particles, 3))
 
         self.current_state = init_state
-        self.prev_odom = init_state
+        self.prev_odom = None
+
+        self.translation_noise = translation_noise
+        self.rotation_noise = rotation_noise
+        self.laser_noise = laser_noise
 
         self.init_filter()
 
     def init_filter(self):
         for i in range(self.num_particles):
-            x = np.random.uniform(self.x_min, self.x_max)
-            y = np.random.uniform(self.y_min, self.y_max)
-            yaw = np.random.uniform(-np.pi, np.pi)
+            x = np.random.uniform(self.init_state[0] - 0.5 * np.abs(self.x_min), self.init_state[0] + 0.5 * np.abs(self.x_max))
+            y = np.random.uniform(self.init_state[1] - 0.5 * np.abs(self.y_min), self.init_state[1] + 0.5 * np.abs(self.y_max))
+            yaw = np.random.uniform(self.init_state[2] - np.pi / 2, self.init_state[2] + np.pi / 2)
             self.particles[i] = np.array([x, y, yaw])
         self.weights = np.ones(self.num_particles) / self.num_particles
 
@@ -94,10 +99,10 @@ class ParticleFilter:
         distances = []
         for actual, predicted in zip(scan[::subsample_step], predicted_scan):
             if actual == float('inf'):
-                actual = self.laser_max_range
-            distances.append(np.abs(actual - predicted))
-        error = np.linalg.norm(distances) 
-        return error
+                actual = np.sqrt(self.x_max ** 2 + self.y_max ** 2)
+            distances.append(actual - predicted)
+        error = np.linalg.norm(distances)
+        return error ** 2
     
     def resample(self):
         cValues = []
@@ -121,26 +126,50 @@ class ParticleFilter:
         self.weights = np.ones(self.num_particles) / self.num_particles
 
     def motion_update(self, odom):
-        dx = self.prev_odom[0] - odom[0]
-        dy = self.prev_odom[1] - odom[1]
-        dyaw = self.prev_odom[2] - odom[2]
+        if self.prev_odom:
+            p_current = np.array([odom.pose.pose.position.x,
+                                        odom.pose.pose.position.y,
+                                        odom.pose.pose.position.z])
 
-        for i in range(self.num_particles):
-            self.particles[i][0] += dx
-            self.particles[i][1] += dy
-            self.particles[i][2] += dyaw
-            
-            if self.particles[i][2] < -np.pi:
-                self.particles[i][2] += 2 * np.pi
-            if self.particles[i][2] > np.pi:
-                self.particles[i][2] -= 2 * np.pi  
+            p_prev = np.array([self.prev_odom.pose.pose.position.x,
+                            self.prev_odom.pose.pose.position.y,
+                            self.prev_odom.pose.pose.position.z])
+
+            q_prev = np.array([self.prev_odom.pose.pose.orientation.x,
+                            self.prev_odom.pose.pose.orientation.y,
+                            self.prev_odom.pose.pose.orientation.z,
+                            self.prev_odom.pose.pose.orientation.w])
+
+            q_current = np.array([odom.pose.pose.orientation.x,
+                                odom.pose.pose.orientation.y,
+                                odom.pose.pose.orientation.z,
+                                odom.pose.pose.orientation.w])
+
+            R = quaternion_matrix(q_prev)[0:3, 0:3]
+
+            p_diff = R.transpose().dot(p_current - p_prev)
+            q_diff = quaternion_multiply(quaternion_inverse(q_prev), q_current)
+
+            dyaw = euler_from_quaternion(q_diff)[2] 
+            dx = p_diff[0] 
+            dy = p_diff[1] 
+
+            dyaw += dyaw * np.random.normal(0, self.rotation_noise)
+            dx += dx * np.random.normal(0, self.translation_noise)
+            dy += dy * np.random.normal(0, self.translation_noise)
+
+            v = np.sqrt(dx ** 2 + dy ** 2)
+            for i in range(self.num_particles):
+                self.particles[i][0] += v * np.cos(self.particles[i][2])
+                self.particles[i][1] += v * np.sin(self.particles[i][2])
+                self.particles[i][2] += dyaw
 
         self.prev_odom = odom
 
     def sensor_update(self, scan):
         for i in range(self.num_particles):
             error = self.prediction_error(self.particles[i], scan)
-            self.weights[i] = np.exp(-error)
+            self.weights[i] = np.exp(-error) # 1 / (1 + error)
 
     def localize(self, odom, scan, map):
         self.map = map

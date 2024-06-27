@@ -23,8 +23,9 @@
             <commandTopic>cmd_vel</commandTopic>
             <robotBaseFrame>base_link</robotBaseFrame>
             <odometryTopic>odom_gazebo</odometryTopic>
-            <publishOdom>false</publishOdom>
-            <publishOdomTF>false</publishOdomTF>
+            <odometrySource>encoder</odometrySource>
+            <publishOdom>true</publishOdom>
+            <publishOdomTF>true</publishOdomTF>
             <publishWheelTF>false</publishWheelTF>
             <publishWheelJointState>true</publishWheelJointState>
             <legacyMode>false</legacyMode>

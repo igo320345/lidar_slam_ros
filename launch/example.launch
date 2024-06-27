@@ -18,6 +18,6 @@
     <node name="my_robot_model_spawn" pkg="gazebo_ros" type="spawn_model" output="screen"
     args="-urdf -param robot_description -model my_robot_model -x 1 -y 1 -z 0"/>
     <node name="map_server" pkg="map_server" type="map_server" args="$(find lidar_slam_ros)/room_with_walls_1/map.yaml"/>
-    <node name="lidar_odometry_node" pkg="lidar_slam_ros" type="lidar_odometry.py" output="screen"/>
+    <!--<node name="lidar_odometry_node" pkg="lidar_slam_ros" type="lidar_odometry.py" output="screen"/>-->
     <node name="lidar_localization_node" pkg="lidar_slam_ros" type="lidar_localization.py" output="screen"/>
 </launch>
