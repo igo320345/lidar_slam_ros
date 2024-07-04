@@ -19,9 +19,6 @@ class LidarOdometry:
         self.odom_publisher = rospy.Publisher('/odom', Odometry, queue_size=1)
         self.current_scan = None
         self.previous_scan = None
-        self.pose = Pose()
-        self.pose.position.x = 0.275
-        self.pose.position.z = 0.325
         self.odom = Odometry()
         self.odom.header.frame_id = 'odom'
         self.odom.child_frame_id = 'base_link'
@@ -38,7 +35,7 @@ class LidarOdometry:
         S = self.transform_to_matrix(transform)      
         P = self.pose_to_matrix(pose)
         P = P @ np.linalg.inv(S)
-        pose = self.matrix_to_pose(np.linalg.inv(P))
+        pose = self.matrix_to_pose(P)
        
         self.tf_publisher.sendTransform((pose.position.x, pose.position.y, pose.position.z),
                                         (pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w), 
@@ -82,36 +79,10 @@ class LidarOdometry:
         T[2][3] = trans[2]
         return T
   
-    def range_to_pcl(self, source, destination):
-        beam_angle_increment = 2 * np.pi / 720.0
-        beam_angle = -np.pi
-
-        points_source, points_destination = [], []
-        for length_source, length_destination in zip(source, destination):
-
-            if 0.4 < length_source < float('inf') and 0.4 < length_destination < float('inf'):
-
-                point_x = length_source * np.cos(beam_angle)
-                point_y = length_source * np.sin(beam_angle)
-
-                point = np.array([point_x,point_y, 0])
-                points_source.append(point)
-
-                point_x = length_destination * np.cos(beam_angle)
-                point_y = length_destination * np.sin(beam_angle)
-
-                point = np.array([point_x,point_y, 0])
-                points_destination.append(point)
-
-            beam_angle += beam_angle_increment
-
-        return np.array(points_source), np.array(points_destination)
-
     def spin(self):
         while not rospy.is_shutdown():
             if self.current_scan != None:
-                source, destination = self.range_to_pcl(self.previous_scan.ranges, self.current_scan.ranges)
-                T = icp(source, destination, max_iterations=20, tolerance=1.0e-9)
+                T = icp(self.previous_scan.ranges, self.current_scan.ranges, max_iterations=20, tolerance=1.0e-9)
                 self.update_pose(T)
             self.rate.sleep()
 

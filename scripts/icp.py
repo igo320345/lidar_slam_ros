@@ -2,6 +2,31 @@ import numpy as np
 from sklearn.neighbors import NearestNeighbors
 
 
+def range_to_pcl(source, destination):
+    beam_angle_increment = 2 * np.pi / 360
+    beam_angle = -np.pi
+
+    points_source, points_destination = [], []
+    for length_source, length_destination in zip(source, destination):
+
+        if 0 < length_source < float('inf') and 0 < length_destination < float('inf'):
+
+            point_x = length_source * np.cos(beam_angle)
+            point_y = length_source * np.sin(beam_angle)
+
+            point = np.array([point_x,point_y, 0])
+            points_source.append(point)
+
+            point_x = length_destination * np.cos(beam_angle)
+            point_y = length_destination * np.sin(beam_angle)
+
+            point = np.array([point_x,point_y, 0])
+            points_destination.append(point)
+
+        beam_angle += beam_angle_increment
+
+    return np.array(points_source), np.array(points_destination)
+
 def best_fit_transform(A, B):
     
     assert A.shape == B.shape
@@ -41,6 +66,7 @@ def nearest_neighbor(src, dst):
 
 
 def icp(A, B, init_pose=None, max_iterations=20, tolerance=0.001):
+    A, B = range_to_pcl(A, B)
 
     assert A.shape == B.shape
 

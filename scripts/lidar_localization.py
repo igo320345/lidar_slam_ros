@@ -20,7 +20,7 @@ class LidarLocalization:
         self.tf_publisher = tf.TransformBroadcaster()
         self.tf_listener = tf.TransformListener()
         self.lidar_subscriber = rospy.Subscriber('/scan', LaserScan, self.lidar_callback)
-        self.odom_subscriber = rospy.Subscriber('/odom_gazebo', Odometry, self.odom_callback)
+        self.odom_subscriber = rospy.Subscriber('/odom', Odometry, self.odom_callback)
         self.map_subscriber = rospy.Subscriber('/map', OccupancyGrid, self.map_callback)
         self.pose_publisher = rospy.Publisher('/pose', PoseStamped, queue_size=1)
         self.particles_publisher = rospy.Publisher('/particles', MarkerArray, queue_size=1)

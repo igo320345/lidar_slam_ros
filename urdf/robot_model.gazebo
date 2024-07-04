@@ -24,8 +24,8 @@
             <robotBaseFrame>base_link</robotBaseFrame>
             <odometryTopic>odom_gazebo</odometryTopic>
             <odometrySource>encoder</odometrySource>
-            <publishOdom>true</publishOdom>
-            <publishOdomTF>true</publishOdomTF>
+            <publishOdom>false</publishOdom>
+            <publishOdomTF>false</publishOdomTF>
             <publishWheelTF>false</publishWheelTF>
             <publishWheelJointState>true</publishWheelJointState>
             <legacyMode>false</legacyMode>
