@@ -8,7 +8,7 @@ from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry, OccupancyGrid
 from geometry_msgs.msg import PoseStamped, Pose, Point
 from visualization_msgs.msg import MarkerArray, Marker
-from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_matrix, quaternion_from_matrix
+from tf.transformations import quaternion_from_euler, quaternion_matrix, quaternion_from_matrix, euler_from_quaternion
 
 from particle_filter import ParticleFilter
 
@@ -30,22 +30,10 @@ class LidarLocalization:
         self.map = None
         self.pose.header.stamp = rospy.Time.now()
         self.pose.header.frame_id = 'map'
-        self.particle_filter = ParticleFilter(num_particles=100,
-                                              init_state=[self.pose.pose.position.x,
-                                                          self.pose.pose.position.y, 
-                                                          euler_from_quaternion([self.pose.pose.orientation.x,
-                                                                                self.pose.pose.orientation.y,
-                                                                                self.pose.pose.orientation.z,
-                                                                                self.pose.pose.orientation.w])[2]],
-                                                laser_min_range=0.4,
-                                                laser_max_range=4,
-                                                laser_min_angle=-np.pi,
-                                                laser_max_angle=np.pi,
-                                                laser_samples=4,
-                                                x_min=-5, x_max=5, y_min=-5, y_max=5,
-                                                translation_noise=0.5,
-                                                rotation_noise=0.1,
-                                                laser_noise=0.001)
+        self.particle_filter = ParticleFilter(laser_pose=[0.275, 0, 0], 
+                                              laser_min_angle=-np.pi,
+                                              laser_max_angle=np.pi,
+                                              laser_max_range=12)
 
     def lidar_callback(self, data):
         self.scan = data
@@ -111,7 +99,13 @@ class LidarLocalization:
     def spin(self):
         while not rospy.is_shutdown():
             if self.odom != None and self.map != None and self.scan != None:
-                pose = self.particle_filter.localize(self.odom, self.scan.ranges, self.map)
+                odom = [self.odom.pose.pose.position.x, 
+                        self.odom.pose.pose.position.y, 
+                        euler_from_quaternion([self.odom.pose.pose.orientation.x,
+                                               self.odom.pose.pose.orientation.y,
+                                               self.odom.pose.pose.orientation.z,
+                                               self.odom.pose.pose.orientation.w])[2]]
+                pose = self.particle_filter.localize(odom, self.scan.ranges, self.map)
                 self.publish_particles()
                 orientation = quaternion_from_euler(0, 0, pose[2])
                 self.pose.pose.position.x = pose[0]

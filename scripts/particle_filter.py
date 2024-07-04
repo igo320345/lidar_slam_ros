@@ -1,108 +1,146 @@
 import numpy as np
-from tf.transformations import quaternion_matrix, quaternion_multiply, euler_from_quaternion, quaternion_inverse
 
+def angle_diff(a, b):
+    a = np.arctan2(np.sin(a), np.cos(a))
+    b = np.arctan2(np.sin(b), np.cos(b))
+
+    d1 = a - b
+    d2 = 2 * np.pi - np.abs(d1)
+
+    if d1 > 0.0:
+        d2 *= -1.0
+    
+    if np.abs(d1) < np.abs(d2):
+        return d1
+    else:
+        return d2
+
+def vector_coord_add(a, b):
+    c = np.array([0, 0, 0])
+
+    c[0] = b[0] + a[0] * np.cos(b[2]) - a[1] * np.sin(b[2])
+    c[1] = b[1] + a[0] * np.sin(b[2]) - a[1] * np.cos(b[2])
+    c[2] = b[2] + a[2]
+    
+    c[2] = np.arctan2(np.sin(c[2]), np.cos(c[2]))
+
+    return c
+
+def metric_to_grid_coords(x, y, map_info):
+        gx = (x - map_info.origin.position.x) / map_info.resolution
+        gy = (y - map_info.origin.position.y) / map_info.resolution
+        row = min(max(int(gy), 0), map_info.height)
+        col = min(max(int(gx), 0), map_info.width)
+        return (row, col)
+
+def map_calc_range(map, map_info, x, y, yaw, max_range):
+    x0, y0 = metric_to_grid_coords(x, y, map_info)
+    x1, y1 = metric_to_grid_coords(x + max_range * np.cos(yaw), y + max_range * np.sin(yaw), map_info)
+
+    if np.abs(y1- y0) > np.abs(x1 - x0):
+        steep = 1
+    else:
+        steep = 0
+
+    if steep:
+        x0, y0 = y0, x0
+    
+    deltax = np.abs(x1 - x0)
+    deltay = np.abs(y1 - y0)
+    error = 0
+    deltaerr = deltay
+
+    x, y = x0, y0
+
+    if x0 < x1:
+        xstep = 1
+    else:
+        xstep = -1
+
+    if y0 < y1:
+        ystep = 1
+    else:
+        ystep = -1
+    
+    if steep:
+        if y >= map.shape[0] or x >= map.shape[1] or not map[y, x].all():
+            return np.sqrt((x - x0) * (x - x0) + (y - y0) * (y - y0)) * map_info.resolution
+    else:
+        if x >= map.shape[0] or y >= map.shape[1] or not map[x, y].all():
+            return np.sqrt((x - x0) * (x - x0) + (y - y0) * (y - y0)) * map_info.resolution
+        
+    while x != x1 + xstep:
+        x += xstep
+        error += deltaerr
+
+        if 2 * error >= deltax:
+            y += ystep
+            error -= deltax
+        
+        if steep:
+            if y >= map.shape[0] or x >= map.shape[1] or not map[y, x].all():
+                return np.sqrt((x - x0) * (x - x0) + (y - y0) * (y - y0)) * map_info.resolution
+        else:
+            if x >= map.shape[0] or y >= map.shape[1] or not map[x, y].all():
+                return np.sqrt((x - x0) * (x - x0) + (y - y0) * (y - y0)) * map_info.resolution
+    
+    return max_range
+    
 class ParticleFilter:
-    def __init__(self, num_particles, init_state, laser_min_range, laser_max_range, laser_min_angle, laser_max_angle, laser_samples, x_min, x_max, y_min, y_max, translation_noise, rotation_noise, laser_noise):
+    def __init__(self,
+                 laser_pose,
+                 laser_min_angle,
+                 laser_max_angle,
+                 laser_max_range,
+                 num_particles = 100,
+                 init_state = [0, 0, 0],
+                 laser_beams = 8,
+                 laser_sigma_hit = 0.5,
+                 laser_z_hit = 1,
+                 laser_z_rand = 0,
+                 laser_z_short = 0,
+                 laser_z_max = 0,
+                 laser_lambda_short = 0.1,
+                 odom_alpha1 = 0.1, 
+                 odom_alpha2 = 0.1,
+                 odom_alpha3 = 0.1,
+                 odom_alpha4 = 0.1):
+        
         self.num_particles = num_particles
         self.init_state = init_state
 
-        self.laser_min_range = laser_min_range
-        self.laser_max_range = laser_max_range
+        self.laser_pose = laser_pose
+        self.laser_beams = laser_beams
+        self.laser_sigma_hit = laser_sigma_hit
+        self.laser_z_hit = laser_z_hit
+        self.laser_z_rand = laser_z_rand
+        self.laser_z_short = laser_z_short
+        self.laser_z_max = laser_z_max
+        self.laser_lambda_short = laser_lambda_short
         self.laser_min_angle = laser_min_angle
         self.laser_max_angle = laser_max_angle
-        self.laser_samples = laser_samples
-
-        self.x_max = x_max
-        self.x_min = x_min
-        self.y_min = y_min
-        self.y_max = y_max
+        self.laser_max_range = laser_max_range
         
         self.weights = np.zeros(self.num_particles)
         self.particles = np.zeros((self.num_particles, 3))
 
-        self.current_state = init_state
-        self.prev_odom = None
+        self.current_state = self.init_state
+        self.prev_odom = [0, 0, 0]
 
-        self.translation_noise = translation_noise
-        self.rotation_noise = rotation_noise
-        self.laser_noise = laser_noise
+        self.odom_alpha1 = odom_alpha1
+        self.odom_alpha2 = odom_alpha2
+        self.odom_alpha3 = odom_alpha3
+        self.odom_alpha4 = odom_alpha4
 
         self.init_filter()
 
     def init_filter(self):
         for i in range(self.num_particles):
-            x = np.random.uniform(self.init_state[0] - 0.5 * np.abs(self.x_min), self.init_state[0] + 0.5 * np.abs(self.x_max))
-            y = np.random.uniform(self.init_state[1] - 0.5 * np.abs(self.y_min), self.init_state[1] + 0.5 * np.abs(self.y_max))
-            yaw = np.random.uniform(self.init_state[2] - np.pi / 2, self.init_state[2] + np.pi / 2)
+            x = np.random.normal(self.init_state[0], 0.1)
+            y = np.random.normal(self.init_state[1], 0.1)
+            yaw = np.random.normal(self.init_state[2], np.pi / 4)
             self.particles[i] = np.array([x, y, yaw])
         self.weights = np.ones(self.num_particles) / self.num_particles
-
-    def metric_to_grid_coords(self, x, y):
-        gx = (x - self.map.info.origin.position.x) / self.map.info.resolution
-        gy = (y - self.map.info.origin.position.y) / self.map.info.resolution
-        row = min(max(int(gy), 0), self.map.info.height)
-        col = min(max(int(gx), 0), self.map.info.width)
-        return (row, col)
-    
-    def predict_scan(self, particle):
-        ranges = []
-        range_step = self.map.info.resolution
-
-        for angle in np.linspace(-self.laser_min_angle, self.laser_max_angle, self.laser_samples):
-            phi = particle[2] + angle
-
-            r = self.laser_min_range
-            while r <= self.laser_max_range:
-                xm = particle[0] + r * np.cos(phi)
-                ym = particle[1] + r * np.sin(phi)
-
-                if xm > self.x_max or xm < self.x_min:
-                    break
-
-                if ym > self.y_max or ym < self.y_min:
-                    break
-
-                row, col = self.metric_to_grid_coords(xm, ym)
-                if row >= self.grid_bin.shape[0] or col >= self.grid_bin.shape[1]:
-                    break
-                free = self.grid_bin[row, col].all()
-                if not free:
-                    break
-
-                r += range_step
-
-            ranges.append(r)
-
-        return ranges
-    
-    def prediction_error(self, particle, scan):
-        if not hasattr(self, 'grid_bin'):
-            grid_map = np.array(self.map.data, dtype='int8')
-            grid_map = grid_map.reshape((self.map.info.height, self.map.info.width))
-            self.grid_bin = (grid_map == 0).astype('uint8')
-
-        if particle[0] < self.x_min or particle[0] > self.x_max:
-            return 10e9
-        
-        if particle[1] < self.y_min or particle[1] > self.y_max:
-            return 10e9
-        
-        row, col = self.metric_to_grid_coords(particle[0], particle[1])
-        if row >= self.grid_bin.shape[0] or col >= self.grid_bin.shape[1]:
-            return 10e9
-        
-        if not self.grid_bin[row, col]:
-            return 10e9
-        
-        predicted_scan = self.predict_scan(particle)
-        subsample_step = len(scan) // self.laser_samples
-        distances = []
-        for actual, predicted in zip(scan[::subsample_step], predicted_scan):
-            if actual == float('inf'):
-                actual = np.sqrt(self.x_max ** 2 + self.y_max ** 2)
-            distances.append(actual - predicted)
-        error = np.linalg.norm(distances)
-        return error ** 2
     
     def resample(self):
         cValues = []
@@ -125,62 +163,81 @@ class ParticleFilter:
         self.particles = self.particles[resampledIndex]
         self.weights = np.ones(self.num_particles) / self.num_particles
 
-    def motion_update(self, odom):
-        if self.prev_odom:
-            p_current = np.array([odom.pose.pose.position.x,
-                                        odom.pose.pose.position.y,
-                                        odom.pose.pose.position.z])
+    # sample motion model from Probability Robotics
+    def sample_motion_model_odometry(self, odom):
+        if np.sqrt((self.prev_odom[0] - odom[0]) ** 2 + (self.prev_odom[1] - odom[1]) ** 2) < 0.01:
+            d_rot1 = 0.0
+        else:
+            d_rot1 = angle_diff(np.arctan2(odom[1] - self.prev_odom[1], odom[0] - self.prev_odom[0]), self.prev_odom[2])
+        d_trans = np.sqrt((self.prev_odom[0] - odom[0]) ** 2 + (self.prev_odom[1] - odom[1]) ** 2)
+        d_rot2 = angle_diff(odom[2] - self.prev_odom[2], d_rot1)
 
-            p_prev = np.array([self.prev_odom.pose.pose.position.x,
-                            self.prev_odom.pose.pose.position.y,
-                            self.prev_odom.pose.pose.position.z])
+        d_rot1_noise = np.min([np.abs(angle_diff(d_rot1, 0.0)), np.abs(angle_diff(d_rot1, np.pi))])
+        d_rot2_noise = np.min([np.abs(angle_diff(d_rot2, 0.0)), np.abs(angle_diff(d_rot2, np.pi))])
 
-            q_prev = np.array([self.prev_odom.pose.pose.orientation.x,
-                            self.prev_odom.pose.pose.orientation.y,
-                            self.prev_odom.pose.pose.orientation.z,
-                            self.prev_odom.pose.pose.orientation.w])
+        for i in range(self.num_particles):
+            dhat_rot1 = angle_diff(d_rot1, np.random.normal(0, 
+                np.sqrt(self.odom_alpha1 * d_rot1_noise ** 2 + self.odom_alpha2 * d_trans ** 2)))
+            dhat_trans = d_trans - np.random.normal(0, 
+                np.sqrt(self.odom_alpha3 * d_trans ** 2 + self.odom_alpha4 * d_rot1_noise ** 2 + self.odom_alpha4 * d_rot2_noise ** 2))
+            dhat_rot2 = angle_diff(d_rot2, np.random.normal(0, 
+                np.sqrt(self.odom_alpha1 * d_rot2_noise ** 2 + self.odom_alpha2 * d_trans ** 2)))
 
-            q_current = np.array([odom.pose.pose.orientation.x,
-                                odom.pose.pose.orientation.y,
-                                odom.pose.pose.orientation.z,
-                                odom.pose.pose.orientation.w])
-
-            R = quaternion_matrix(q_prev)[0:3, 0:3]
-
-            p_diff = R.transpose().dot(p_current - p_prev)
-            q_diff = quaternion_multiply(quaternion_inverse(q_prev), q_current)
-
-            dyaw = euler_from_quaternion(q_diff)[2] 
-            dx = p_diff[0] 
-            dy = p_diff[1] 
-
-            dyaw += dyaw * np.random.normal(0, self.rotation_noise)
-            dx += dx * np.random.normal(0, self.translation_noise)
-            dy += dy * np.random.normal(0, self.translation_noise)
-
-            v = np.sqrt(dx ** 2 + dy ** 2)
-            for i in range(self.num_particles):
-                self.particles[i][0] += v * np.cos(self.particles[i][2])
-                self.particles[i][1] += v * np.sin(self.particles[i][2])
-                self.particles[i][2] += dyaw
+            self.particles[i, 0] += dhat_trans * np.cos(self.particles[i, 2] + dhat_rot1)
+            self.particles[i, 1] += dhat_trans * np.sin(self.particles[i, 2] + dhat_rot1)
+            self.particles[i, 2] +=  dhat_rot1 + dhat_rot2
 
         self.prev_odom = odom
 
-    def sensor_update(self, scan):
+    # beam range finder model from Probability Robotics
+    def beam_range_finder_model(self, ranges):
+        angles = np.linspace(self.laser_min_angle, self.laser_max_angle, len(ranges))
         for i in range(self.num_particles):
-            error = self.prediction_error(self.particles[i], scan)
-            self.weights[i] = np.exp(-error) # 1 / (1 + error)
+            q = 1
+            pose = vector_coord_add(self.laser_pose, self.particles[i])
+            step = len(ranges) // self.laser_beams
+            for k in range(0, len(ranges), step):
+                r = ranges[k]
+                if r > self.laser_max_range:
+                    r = self.laser_max_range
 
-    def localize(self, odom, scan, map):
+                pz = 0
+                map_range = map_calc_range(self.grid_bin, self.map.info, pose[0], pose[1], pose[2] + angles[k], self.laser_max_range)
+                z = r - map_range
+
+                pz += self.laser_z_hit * np.exp(-(z ** 2) / (2 * self.laser_sigma_hit ** 2))
+
+                if z < 0:
+                    pz += self.laser_z_short * self.laser_lambda_short * np.exp(-self.laser_lambda_short * r)
+                
+                if r == self.laser_max_range:
+                    pz += self.laser_z_max
+
+                if r < self.laser_max_range:
+                    pz += self.laser_z_rand / self.laser_max_range
+
+                q += pz ** 3
+
+            self.weights[i] *= q
+        
+    def localize(self, odom, ranges, map):
+        
         self.map = map
-        self.motion_update(odom)
-        self.sensor_update(scan)
+
+        if not hasattr(self, 'grid_bin'):
+            grid_map = np.array(self.map.data, dtype='int8')
+            grid_map = grid_map.reshape((self.map.info.height, self.map.info.width))
+            self.grid_bin = (grid_map == 0).astype('uint8')
+        
+        self.sample_motion_model_odometry(odom)
+        self.beam_range_finder_model(ranges)
     
         self.weights = self.weights / np.sum(self.weights)
         n_eff = 1 / (np.sum(np.power(np.array(self.weights), 2)))
         
-        if n_eff < self.num_particles // 3:
+        if n_eff < self.num_particles:
             self.resample()
+    
         self.mean_state()
         return self.current_state
     
