@@ -92,19 +92,19 @@ class ParticleFilter:
                  laser_min_angle,
                  laser_max_angle,
                  laser_max_range,
-                 num_particles = 100,
-                 init_state = [0, 0, 0],
-                 laser_beams = 8,
-                 laser_sigma_hit = 0.5,
-                 laser_z_hit = 1,
-                 laser_z_rand = 0,
-                 laser_z_short = 0,
-                 laser_z_max = 0,
-                 laser_lambda_short = 0.1,
-                 odom_alpha1 = 0.1, 
-                 odom_alpha2 = 0.1,
-                 odom_alpha3 = 0.1,
-                 odom_alpha4 = 0.1):
+                 num_particles,
+                 init_state,
+                 laser_beams,
+                 laser_sigma_hit,
+                 laser_z_hit,
+                 laser_z_rand,
+                 laser_z_short,
+                 laser_z_max,
+                 laser_lambda_short,
+                 odom_alpha1, 
+                 odom_alpha2,
+                 odom_alpha3 ,
+                 odom_alpha4):
         
         self.num_particles = num_particles
         self.init_state = init_state
