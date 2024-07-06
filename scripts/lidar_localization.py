@@ -6,12 +6,12 @@ import numpy as np
 from std_msgs.msg import ColorRGBA
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry, OccupancyGrid
-from geometry_msgs.msg import PoseStamped, Pose, Point
+from geometry_msgs.msg import PoseStamped, Point
 from visualization_msgs.msg import MarkerArray, Marker
-from tf.transformations import quaternion_from_euler, quaternion_matrix, quaternion_from_matrix, euler_from_quaternion
+from tf.transformations import quaternion_from_euler, euler_from_quaternion
 
 from particle_filter import ParticleFilter
-
+from utils import transform_to_matrix, pose_to_matrix, matrix_to_pose
 
 class LidarLocalization:
     def __init__(self):
@@ -43,34 +43,6 @@ class LidarLocalization:
 
     def map_callback(self, data):
         self.map = data
-    
-    def transform_to_matrix(self, transform):
-        (trans, rot) = transform
-        T = quaternion_matrix(rot)
-        T[0][3] = trans[0]
-        T[1][3] = trans[1]
-        T[2][3] = trans[2]
-        return T
-
-    def pose_to_matrix(self, pose):
-        q = [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
-        P = quaternion_matrix(q)
-        P[0][3] = pose.position.x
-        P[1][3] = pose.position.y
-        P[2][3] = pose.position.z
-        return P
-
-    def matrix_to_pose(self, P):
-        pose = Pose()
-        pose.position.x = P[0][3]
-        pose.position.y = P[1][3]
-        pose.position.z = P[2][3]
-        q = quaternion_from_matrix(P)
-        pose.orientation.x = q[0]
-        pose.orientation.y = q[1]
-        pose.orientation.z = q[2]
-        pose.orientation.w = q[3]
-        return pose
     
     def publish_particles(self):
         marker_array = MarkerArray()
@@ -118,10 +90,10 @@ class LidarLocalization:
                 self.pose_publisher.publish(self.pose)
                 
                 transform = self.tf_listener.lookupTransform('odom', 'base_link', rospy.Time(0))
-                T = self.transform_to_matrix(transform) 
-                P = self.pose_to_matrix(self.pose.pose) 
+                T = transform_to_matrix(transform) 
+                P = pose_to_matrix(self.pose.pose) 
                 M = P @ np.linalg.inv(T)
-                map_transform = self.matrix_to_pose(M)
+                map_transform = matrix_to_pose(M)
                 self.tf_publisher.sendTransform((map_transform.position.x, map_transform.position.y, map_transform.position.z),
                                         (map_transform.orientation.x, map_transform.orientation.y, map_transform.orientation.z, map_transform.orientation.w), 
                                         rospy.Time.now(), 'odom', 'map')   

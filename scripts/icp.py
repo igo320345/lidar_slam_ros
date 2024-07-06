@@ -39,7 +39,7 @@ def best_fit_transform(A, B):
     BB = B - centroid_B
 
     H = np.dot(AA.T, BB)
-    U, S, Vt = np.linalg.svd(H)
+    U, _, Vt = np.linalg.svd(H)
     R = np.dot(Vt.T, U.T)
 
     if np.linalg.det(R) < 0:
@@ -59,7 +59,7 @@ def nearest_neighbor(src, dst):
 
     assert src.shape == dst.shape
 
-    neigh = NearestNeighbors(n_neighbors=1, algorithm='kd_tree')
+    neigh = NearestNeighbors(n_neighbors=1)
     neigh.fit(dst)
     distances, indices = neigh.kneighbors(src, return_distance=True)
     return distances.ravel(), indices.ravel()

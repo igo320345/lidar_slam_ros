@@ -19,7 +19,7 @@
             <wheelSeparation>0.65</wheelSeparation>
             <wheelDiameter>0.2</wheelDiameter>
             <wheelAcceleration>1.0</wheelAcceleration>
-            <wheelTorque>20</wheelTorque>
+            <wheelTorque>100</wheelTorque>
             <commandTopic>cmd_vel</commandTopic>
             <robotBaseFrame>base_link</robotBaseFrame>
             <odometryTopic>odom_gazebo</odometryTopic>

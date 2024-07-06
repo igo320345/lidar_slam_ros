@@ -101,10 +101,10 @@ class ParticleFilter:
                  laser_z_short = 0,
                  laser_z_max = 0,
                  laser_lambda_short = 0.1,
-                 odom_alpha1 = 0.1, 
-                 odom_alpha2 = 0.1,
-                 odom_alpha3 = 0.1,
-                 odom_alpha4 = 0.1):
+                 odom_alpha1 = 0.2, 
+                 odom_alpha2 = 0.2,
+                 odom_alpha3 = 0.2,
+                 odom_alpha4 = 0.2):
         
         self.num_particles = num_particles
         self.init_state = init_state
