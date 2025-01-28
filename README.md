@@ -1,4 +1,4 @@
-# 2D LiDAR Localization and Mapping
+# 2D LiDAR Localization
 
 ```
 <node name="lidar_localization_node" pkg="lidar_slam_ros" type="lidar_localization.py">
